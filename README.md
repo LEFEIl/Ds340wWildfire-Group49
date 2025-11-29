@@ -49,6 +49,7 @@ wildfire-prediction-dataset/
 └── test/
     ├── wildfire/
     └── nowildfire/
+``` 
 In the code, this is referenced as:
 
 BASE_DIR  = "/kaggle/input/wildfire-prediction-dataset"
@@ -163,24 +164,24 @@ Data augmentation and normalization using tf.data.map
 Caching and prefetching for better I/O performance
 
 Add a time dimension:
-
+```text
 def add_time_dim(images, labels):
     # (batch, H, W, C) -> (batch, TIME_STEPS, H, W, C)
     images = tf.expand_dims(images, axis=1)
     return images, labels
-
+```
 
 Compute class weights by counting files in the train/ folders
 (ignoring hidden files) to cope with class imbalance:
-
+```text
 class_weight = {
     0: total / (2.0 * neg),  # nowildfire
     1: total / (2.0 * pos),  # wildfire
 }
-
+```
 
 Train with early stopping:
-
+```text
 history = model.fit(
     train_ds,
     epochs=EPOCHS,              # e.g., 5
@@ -195,7 +196,96 @@ history = model.fit(
         )
     ],
 )
-
+```
 
 This setup is designed to be robust to bad / partially corrupted JPEGs and
 to reduce overfitting.
+## 5. Evaluation & Results
+5.1 CNN Results (Original Baseline vs Stronger CNN)
+
+Using the test generator (test_generator / test_generator_augm), the notebook
+computes confusion matrices and prints classification reports.
+
+One example result for the original CNN:
+
+Accuracy: ~0.96
+
+nowildfire: precision ≈ 0.96, recall ≈ 0.96
+
+wildfire: precision ≈ 0.97, recall ≈ 0.97
+
+A stronger CNN variant (Model 3) gives:
+
+Accuracy: ~0.95
+
+Slightly different precision/recall trade-offs across the two classes.
+
+5.2 ConvLSTM Results
+
+For the ConvLSTM model, we:
+
+Sweep thresholds from 0.3 to 0.7 on the validation set to find the
+best decision threshold (best_th) by accuracy.
+
+Apply the best threshold to the test set, collecting predictions and
+computing the confusion matrix:
+```text
+Confusion matrix (test, with best_th):
+[[2746   74]
+ [ 324 3124]]
+```
+Interpreting this:
+
+TN (nowildfire correctly predicted): 2746
+
+FP (nowildfire misclassified as wildfire): 74
+
+FN (missed wildfires): 324
+
+TP (wildfires correctly detected): 3124
+
+From this we obtain approximately:
+
+Accuracy: ~0.94
+
+Wildfire precision: ~0.98
+
+Wildfire recall: ~0.91
+
+Nowildfire precision: ~0.89
+
+Nowildfire recall: ~0.97
+So we can compared to the strongest CNN, the ConvLSTM (with the chosen threshold)
+
+# 6. How to Run
+6.1 Requirements
+
+Python 3.8+
+Jupyter (or JupyterLab)
+Libraries (see imports at the top of the notebook):
+numpy,pandas,matplotlib,seaborn,opencv-python (cv2),Pillow,tensorflow / keras,albumentations,scikit-learn
+
+6.2 Steps (Kaggle)
+
+Create a Kaggle Notebook.
+
+Add the wildfire-prediction-dataset dataset to the notebook.
+
+Upload ds340w-wildfire Final code.ipynb (or copy the cells).
+
+Run all cells from top to bottom (GPU accelerator recommended).
+and all down!
+# 7. File Structure
+
+Currently the main file in this repo is:.
+├── data/           # wildfire-prediction-dataset
+├── notebooks/
+│   └── ds340w-wildfire Final code.ipynb
+└── README.md
+
+# 8. Limitations & Future Work
+The dataset currently provides single images, so ConvLSTM is used with
+TIME_STEPS = 1. In the future, real multi-time-step sequences (may be use daily
+satellite images) would allow ConvLSTM to fully exploit spatio-temporal dynamics.
+
+# Thank You!
